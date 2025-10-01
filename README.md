@@ -1,5 +1,7 @@
 # Laboratoria IML (2025-2026)
 
+Tadeusz Puźniakowski, 2025
+
 To repozytorium zawiera instrukcje i materiały do laboratoriów z przedmiotu IML.
 
 ## Dla studentów
