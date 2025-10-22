@@ -59,7 +59,7 @@ for imputer_name, imputer in imputers.items():
     X_imputed = imputer.fit_transform(X_train_miss)
     X_test_imp = imputer.transform(X_test_miss)
 
-    for model_name, model_template in models.items():
+    for model_name in models.items():
         if model_name == 'LinearRegression':
             model = LinearRegression()
         elif model_name == 'DecisionTree':
