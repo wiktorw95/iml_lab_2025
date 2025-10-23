@@ -3,4 +3,3 @@ matplotlib
 jupyter
 numpy
 scikit-learn
-imblearn
