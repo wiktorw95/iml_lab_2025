@@ -5,6 +5,7 @@ import keras_tuner as kt
 
 from keras import Input
 
+
 tfds.disable_progress_bar()
 MODEL_FILENAME = 'sentiment_model.keras'
 TUNER_DIR = 'kt_tuning'
@@ -62,17 +63,17 @@ class SentimentModelTrainer:
                       metrics=['accuracy'])
         return model
 
-    def tune_and_train_model(self, epochs=5):
+    def tune_and_train_model(self, epochs=3):
         if self.encoder is None:
-            raise RuntimeError('Encoder must be adapted before tuning. Call load_and_prepare_data() first.')
+            raise RuntimeError('Encoder must be adapted before tuning.')
 
-        print("\nTurning on Keras Tuner (Hyperband)...")
+        print("\nTurning on Keras Tuner...")
 
         tuner = kt.Hyperband(
             self.build_model,
             objective='val_accuracy',
             max_epochs=epochs,
-            factor=2,
+            factor=3,
             directory=TUNER_DIR,
             project_name='sentiment_tuning',
             overwrite=True
@@ -98,9 +99,6 @@ class SentimentModelTrainer:
         return history
 
     def save_model(self):
-        if self.model is None:
-            raise RuntimeError("Model is not trained! Call tune_and_train_model() first.")
-
         model_export = tf.keras.Sequential([
             Input(shape=(1,), dtype=tf.string),
             self.encoder,
@@ -121,7 +119,7 @@ if __name__ == '__main__':
     try:
         trainer = SentimentModelTrainer(vocab_size=10000)
         trainer.load_and_prepare_data()
-        trainer.tune_and_train_model(epochs=5)
+        trainer.tune_and_train_model(epochs=3)
         trainer.save_model()
     except Exception as e:
         print(f"An Error occurred during the process: {e}")
