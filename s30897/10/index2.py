@@ -1,9 +1,7 @@
 import keras
-import numpy as np
 import tensorflow as tf
 import tensorflow_datasets as tfds
 import keras_tuner as kt
-import os
 
 from keras import Input
 
@@ -11,8 +9,9 @@ tfds.disable_progress_bar()
 MODEL_FILENAME = 'sentiment_model.keras'
 TUNER_DIR = 'kt_tuning'
 
+
 class SentimentModelTrainer:
-    def __init__(self, vocab_size=1000, buffer_size=100000, batch_size=64,
+    def __init__(self, vocab_size=10000, buffer_size=100000, batch_size=64,
                  dataset_name='imdb_reviews'):
         self.model = None
         self.test_dataset = None
@@ -22,22 +21,22 @@ class SentimentModelTrainer:
         self.BUFFER_SIZE = buffer_size
         self.BATCH_SIZE = batch_size
         self.dataset_name = dataset_name
+
     def load_and_prepare_data(self):
-        print("Ładowanie i przygotowanie danych...")
+        print("Loading and Preparing Data...")
         dataset, info = tfds.load(self.dataset_name, as_supervised=True, with_info=True)
         train_ds, test_ds = dataset['train'], dataset['test']
 
-        # Przypisanie i konfiguracja zbiorów danych
         self.train_dataset = train_ds.shuffle(self.BUFFER_SIZE).batch(self.BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
         self.test_dataset = test_ds.batch(self.BATCH_SIZE).prefetch(tf.data.AUTOTUNE)
 
-        # Tworzenie i adaptacja wektoryzatora (Enkodera)
         self.encoder = tf.keras.layers.TextVectorization(
             max_tokens=self.VOCAB_SIZE
         )
         self.encoder.adapt(self.train_dataset.map(lambda text, label: text))
 
-        print(f"Dane załadowane. Rozmiar słownika: {len(self.encoder.get_vocabulary())}")
+        print(f"Data Loaded! Dictionary size: {len(self.encoder.get_vocabulary())}")
+
     def build_model(self, hp):
         embed_dim = hp.Int('embedding_dim', min_value=32, max_value=128, step=32)
         gru_units = hp.Int('gru_units', min_value=32, max_value=128, step=32)
@@ -58,56 +57,50 @@ class SentimentModelTrainer:
             tf.keras.layers.Dense(1)
         ])
 
-        print([layer.supports_masking for layer in model.layers])
-
-        sample_text = ('The movie was cool. The animation and the graphics '
-                       'were out of this world. I would recommend this movie.')
-        predictions = model.predict(tf.constant([sample_text]))
-        print(predictions[0])
-
-        padding = "the " * 2000
-        input_data = tf.constant([sample_text, padding])
-        predictions = model.predict(input_data)
-        print(predictions[0])
-
         model.compile(loss=tf.keras.losses.BinaryCrossentropy(from_logits=True),
                       optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
                       metrics=['accuracy'])
         return model
-    def tune_and_train_model(self, epochs=3):
+
+    def tune_and_train_model(self, epochs=5):
         if self.encoder is None:
-            raise RuntimeError('Encoder musi być załadowany!')
-        print("\n Uruchamianie Keras Tunera...")
+            raise RuntimeError('Encoder must be adapted before tuning. Call load_and_prepare_data() first.')
+
+        print("\nTurning on Keras Tuner (Hyperband)...")
 
         tuner = kt.Hyperband(
             self.build_model,
             objective='val_accuracy',
             max_epochs=epochs,
-            factor=3,
+            factor=2,
             directory=TUNER_DIR,
-            project_name='sentiment_tuning'
+            project_name='sentiment_tuning',
+            overwrite=True
         )
 
-        tuner.search(self.train_dataset, epochs=epochs, validation_data=self.test_dataset, validation_steps=30)
+        tuner.search(self.train_dataset, epochs=epochs, validation_data=self.test_dataset)
 
         best_hps = tuner.get_best_hyperparameters(num_trials=1)[0]
         self.model = tuner.hypermodel.build(best_hps)
 
-        print("\nZnaleziono najlepsze hiperparametry:")
+        print("\nFound the best hyperparameters:")
         print(best_hps.values)
 
-        print("\n Trenowanie najlepszego modelu...")
+        print("\nTraining the final model...")
         history = self.model.fit(self.train_dataset, epochs=epochs,
                                  validation_data=self.test_dataset)
+
         test_loss, test_acc = self.model.evaluate(self.test_dataset)
-        print(f'\n--- Wyniki Końcowe ---')
+        print(f'\n--- Final Results ---')
         print(f'Test Loss: {test_loss:.4f}')
         print(f'Test Accuracy: {test_acc:.4f}')
         print('------------------------')
         return history
+
     def save_model(self):
         if self.model is None:
-            raise RuntimeError("Model is not trained!")
+            raise RuntimeError("Model is not trained! Call tune_and_train_model() first.")
+
         model_export = tf.keras.Sequential([
             Input(shape=(1,), dtype=tf.string),
             self.encoder,
@@ -119,8 +112,10 @@ class SentimentModelTrainer:
             optimizer=tf.keras.optimizers.Adam(),
             metrics=['accuracy']
         )
+
         model_export.save(MODEL_FILENAME, save_format='keras')
-        print("Model saved!")
+        print(f"Model successfully saved as {MODEL_FILENAME}!")
+
 
 if __name__ == '__main__':
     try:
@@ -129,4 +124,4 @@ if __name__ == '__main__':
         trainer.tune_and_train_model(epochs=5)
         trainer.save_model()
     except Exception as e:
-        print(f"Wystąpił błąd: {e}")
+        print(f"An Error occurred during the process: {e}")
