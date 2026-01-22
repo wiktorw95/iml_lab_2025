@@ -1,16 +1,17 @@
 import tensorflow as tf
 import tensorflow_datasets as tfds
 from tensorflow.keras import layers, models, callbacks
-import numpy as np
-import sys
 from tensorflow.keras.metrics import SparseCategoricalAccuracy
+import sys
+
 
 tf.config.run_functions_eagerly(True)
 tf.random.set_seed(100)
-np.random.seed(100)
+
 
 BATCH_SIZE = 128
 ADAM_LR = 0.001
+
 
 (ds_train, ds_test), ds_info = tfds.load(
     'mnist',
@@ -19,6 +20,7 @@ ADAM_LR = 0.001
     as_supervised=True,
     with_info=True
 )
+
 
 num_train_examples = ds_info.splits['train'].num_examples
 num_test_examples = ds_info.splits['test'].num_examples
@@ -30,7 +32,6 @@ print(f"Rozmiar Batcha: {BATCH_SIZE}. Kroków na epokę: {num_train_examples / B
 
 def normalize_img(image, label):
     return tf.cast(image, tf.float32) / 255., label
-
 
 ds_train = (ds_train.map(normalize_img, num_parallel_calls=tf.data.AUTOTUNE)
             .cache()
@@ -192,11 +193,7 @@ cnn_aug_model.summary()
 cnn_aug_model.fit(ds_train, epochs=10, validation_data=ds_test, callbacks=[early_stopping], verbose=1)
 cnn_aug_model.save('cnn_augmented_mnist_model.keras')
 
-loss_cnn_aug_aug, acc_cnn_aug_aug = evaluate_model(cnn_aug_model, test_images_augmented_np, test_labels_augmented_np)
-
-# ==============================================================================
-# 7. Podsumowanie Wyników
-# ==============================================================================
+loss_cnn_aug_aug, acc_cnn_aug_aug = evaluate_model(cnn_aug_model, ds_test_augmented)
 
 print("\n" + "=" * 50)
 print("             FINALNE PODSUMOWANIE WYNIKÓW")
